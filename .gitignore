@@ -14,3 +14,6 @@ dist/
 
 # Build
 *.tsbuildinfo
+
+# OCR debug output
+backend/debug/
