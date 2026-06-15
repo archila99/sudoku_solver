@@ -1,4 +1,5 @@
 import logging
+import shutil
 from pathlib import Path
 
 import cv2
@@ -6,11 +7,48 @@ import numpy as np
 import pytesseract
 from PIL import Image
 
+from config import get_settings
+
 logger = logging.getLogger(__name__)
 
 GRID_SIZE = 450
 CELL_SIZE = GRID_SIZE // 9
 DEBUG_DIR = Path(__file__).parent / "debug"
+_tesseract_configured = False
+
+
+def configure_tesseract() -> None:
+    global _tesseract_configured
+    if _tesseract_configured:
+        return
+
+    settings = get_settings()
+    if settings.tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
+        _tesseract_configured = True
+        return
+
+    for candidate in (
+        "/usr/bin/tesseract",
+        "/usr/local/bin/tesseract",
+        shutil.which("tesseract"),
+    ):
+        if candidate and Path(candidate).exists():
+            pytesseract.pytesseract.tesseract_cmd = candidate
+            logger.info("Using Tesseract at %s", candidate)
+            _tesseract_configured = True
+            return
+
+    _tesseract_configured = True
+
+
+def verify_tesseract() -> bool:
+    configure_tesseract()
+    try:
+        pytesseract.get_tesseract_version()
+        return True
+    except (pytesseract.TesseractNotFoundError, OSError):
+        return False
 TESSERACT_CONFIGS = [
     r"--oem 3 --psm 10 -c tessedit_char_whitelist=123456789",
     r"--oem 3 --psm 8 -c tessedit_char_whitelist=123456789",
@@ -34,7 +72,9 @@ def extract_board(image_bytes: bytes) -> list[list[int]]:
     warped = cv2.fastNlMeansDenoising(warped, None, 10, 7, 21)
 
     board, sample_cells = _ocr_cells(warped)
-    _save_debug(warped, sample_cells)
+
+    if get_settings().ocr_debug:
+        _save_debug(warped, sample_cells)
 
     return board
 
@@ -430,7 +470,7 @@ def _save_debug(warped: np.ndarray, sample_cells: dict[str, np.ndarray]) -> None
         cv2.imwrite(str(DEBUG_DIR / "warped_grid_lines.png"), _draw_grid_lines(warped))
         for name, image in sample_cells.items():
             cv2.imwrite(str(DEBUG_DIR / f"{name}.png"), image)
-        logger.info("Saved OCR debug images to %s", DEBUG_DIR)
+        logger.debug("Saved OCR debug images to %s", DEBUG_DIR)
     except OSError as exc:
         logger.warning("Could not save debug images: %s", exc)
 

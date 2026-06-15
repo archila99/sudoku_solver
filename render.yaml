@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: sudoku-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: CORS_ORIGINS
+        sync: false
+      - key: OCR_DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: TESSERACT_CMD
+        value: /usr/bin/tesseract
+      - key: MAX_UPLOAD_BYTES
+        value: "10485760"

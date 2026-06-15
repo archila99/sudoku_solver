@@ -1,6 +1,14 @@
 import type { Board, SolveResponse, UploadResponse } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+function getApiBase(): string {
+  const url = import.meta.env.VITE_API_URL;
+  if (import.meta.env.PROD && !url) {
+    throw new Error(
+      "VITE_API_URL is not configured. Set it in your Vercel environment variables.",
+    );
+  }
+  return (url ?? "").replace(/\/$/, "");
+}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -15,7 +23,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function solveSudoku(board: Board): Promise<SolveResponse> {
-  const response = await fetch(`${API_BASE}/solve`, {
+  const response = await fetch(`${getApiBase()}/solve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ board }),
@@ -27,7 +35,7 @@ export async function uploadImage(file: File): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE}/upload`, {
+  const response = await fetch(`${getApiBase()}/upload`, {
     method: "POST",
     body: formData,
   });

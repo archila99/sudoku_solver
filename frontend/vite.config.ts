@@ -5,8 +5,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/solve": "http://localhost:8000",
-      "/upload": "http://localhost:8000",
+      "/solve": {
+        target: process.env.VITE_API_URL || "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+      "/upload": {
+        target: process.env.VITE_API_URL || "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
     },
   },
 });
