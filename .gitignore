@@ -27,5 +27,11 @@ dist/
 # OCR debug output
 backend/debug/
 
+# Diagnostics
+backend/diagnostics/
+
+# Test images
+backend/test_images/
+
 # Vercel
 .vercel

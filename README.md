@@ -1,26 +1,44 @@
 # Sudoku Solver
 
-A stateless full-stack Sudoku web app: manual input, puzzle solving, difficulty detection, and image OCR upload.
+A stateless full-stack Sudoku web app: manual grid input, backtracking solver with difficulty detection, and photo upload with computer-vision OCR.
 
-- **Frontend:** React, TypeScript, Vite, Tailwind CSS → [Vercel](https://vercel.com)
-- **Backend:** Python, FastAPI → [Render](https://render.com)
-- **OCR:** OpenCV + Tesseract (no database)
+| Layer | Stack | Deploy target |
+|-------|-------|---------------|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS | [Vercel](https://vercel.com) |
+| Backend | Python 3.12, FastAPI, OpenCV, Tesseract | [Render](https://render.com) (Docker) |
+
+No database. Upload an image → get a 9×9 board → solve in the browser.
 
 ## Features
 
-- 9×9 Sudoku grid with keyboard navigation
-- Backtracking solver with difficulty detection (easy / medium / hard)
-- Image upload with grid detection and per-cell OCR
+- Interactive 9×9 grid with keyboard navigation
+- Backtracking solver with difficulty labels (easy / medium / hard)
+- Image upload: grid detection, perspective correction, per-cell OCR
+- OCR tuned for flat screenshots, perspective photos, and colorful/noisy backgrounds
+- Optional debug mode that saves every pipeline stage to disk
+
+## How the OCR pipeline works
+
+```
+Image upload
+  → Grayscale + grid enhancement (suppress colorful backgrounds)
+  → Stage 2: Grid detection
+       FAST path:  Hough lines → cluster to 10×10 → corner reconstruction
+       ROBUST path: contour quadrilateral fallback
+  → Perspective warp to 450×450
+  → Validation gate (spacing, aspect ratio, edge density)
+       FAST fails validation → retry with ROBUST corners
+  → Stage 3: Refine 10 horizontal + 10 vertical cell boundaries
+  → Stage 4: Per-cell preprocessing + Tesseract voting → 9×9 board
+```
+
+Empty or uncertain cells are returned as `0`. The solver treats `0` as blank.
 
 ---
 
-## Local development
+## Quick start (local)
 
-### Prerequisites
-
-- Node.js 18+
-- Python 3.12+
-- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract)
+**Prerequisites:** Node.js 18+, Python 3.12+, [Tesseract OCR](https://github.com/tesseract-ocr/tesseract)
 
 ```bash
 # macOS
@@ -30,7 +48,7 @@ brew install tesseract
 sudo apt install tesseract-ocr
 ```
 
-### Backend
+**Terminal 1 — backend**
 
 ```bash
 cd backend
@@ -43,7 +61,7 @@ uvicorn main:app --reload --port 8000
 
 API docs: http://localhost:8000/docs
 
-### Frontend
+**Terminal 2 — frontend**
 
 ```bash
 cd frontend
@@ -79,19 +97,33 @@ When `VITE_API_URL` is unset locally, Vite proxies `/solve` and `/upload` to `ht
 
 ---
 
-## Deploy backend to Render
+## Deploy to GitHub + production
+
+### 1. Push to GitHub
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/<your-username>/sudoku_solver.git
+git push -u origin main
+```
+
+> `backend/debug/`, `backend/diagnostics/`, and `backend/test_images/` are gitignored. Add your own test images locally for OCR development.
+
+### 2. Deploy backend to Render
 
 Render uses Docker so Tesseract and OpenCV system libraries are installed at build time.
 
-### Option A — Blueprint (`render.yaml`)
+#### Option A — Blueprint (`render.yaml`)
 
-1. Push this repo to GitHub.
-2. In [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
-3. Connect the repo. Render reads `render.yaml` at the repo root.
-4. Set `CORS_ORIGINS` to your Vercel URL (e.g. `https://your-app.vercel.app`).
-5. Deploy.
+1. In [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+2. Connect the repo. Render reads `render.yaml` at the repo root.
+3. Set `CORS_ORIGINS` to your Vercel URL (e.g. `https://your-app.vercel.app`).
+4. Deploy.
 
-### Option B — Manual Web Service
+#### Option B — Manual Web Service
 
 1. **New** → **Web Service** → connect repo.
 2. Settings:
@@ -108,48 +140,37 @@ Render uses Docker so Tesseract and OpenCV system libraries are installed at bui
 4. **Health Check Path:** `/health`
 5. Deploy.
 
-### OCR on Render
-
-Tesseract is installed in the Docker image via:
+Tesseract is installed in the Docker image:
 
 ```dockerfile
 RUN apt-get install -y tesseract-ocr
 ```
 
-`TESSERACT_CMD=/usr/bin/tesseract` is set in the Dockerfile and `render.yaml`. No extra build steps needed.
-
-### Verify backend
+Verify:
 
 ```bash
 curl https://your-app.onrender.com/health
 # {"status":"ok"}
-
-curl -X POST https://your-app.onrender.com/solve \
-  -H "Content-Type: application/json" \
-  -d '{"board":[[5,3,0,0,7,0,0,0,0],[6,0,0,1,9,5,0,0,0],[0,9,8,0,0,0,0,6,0],[8,0,0,0,6,0,0,0,3],[4,0,0,8,0,3,0,0,1],[7,0,0,0,2,0,0,0,6],[0,6,0,0,0,0,2,8,0],[0,0,0,4,1,9,0,0,5],[0,0,0,0,8,0,0,7,9]]}'
 ```
 
----
+### 3. Deploy frontend to Vercel
 
-## Deploy frontend to Vercel
-
-1. Push this repo to GitHub.
-2. In [Vercel Dashboard](https://vercel.com) → **Add New Project** → import repo.
-3. Settings:
+1. In [Vercel Dashboard](https://vercel.com) → **Add New Project** → import repo.
+2. Settings:
    - **Framework Preset:** Vite
    - **Root Directory:** `frontend`
    - **Build Command:** `npm run build`
    - **Output Directory:** `dist`
-4. Environment variables:
+3. Environment variable:
    ```
    VITE_API_URL=https://your-app.onrender.com
    ```
    No trailing slash.
-5. Deploy.
+4. Deploy.
 
 `frontend/vercel.json` configures SPA routing (all routes → `index.html`).
 
-### Update CORS after Vercel deploy
+### 4. Update CORS
 
 Copy your Vercel URL and set it on Render:
 
@@ -157,13 +178,7 @@ Copy your Vercel URL and set it on Render:
 CORS_ORIGINS=https://your-app.vercel.app
 ```
 
-For preview deployments, add multiple origins comma-separated:
-
-```
-CORS_ORIGINS=https://your-app.vercel.app,https://your-app-*.vercel.app
-```
-
-(Render does not support wildcards — add each preview URL explicitly, or use a custom domain.)
+For multiple preview URLs, comma-separate origins (Render does not support wildcards).
 
 ---
 
@@ -191,7 +206,7 @@ Response:
 
 ### `POST /upload`
 
-Multipart form field: `file` (image).
+Multipart form field: `file` (JPEG, PNG, WebP, BMP, GIF, or TIFF).
 
 Response:
 
@@ -199,11 +214,18 @@ Response:
 { "board": [[...9x9...]] }
 ```
 
-Empty or uncertain cells are returned as `0`.
+Cells that are empty or ambiguous after OCR are returned as `0`.
+
+Example:
+
+```bash
+curl -X POST http://localhost:8000/upload \
+  -F "file=@puzzle.jpg"
+```
 
 ---
 
-## Difficulty
+## Difficulty detection
 
 | Level | Empty cells |
 |-------|-------------|
@@ -211,38 +233,7 @@ Empty or uncertain cells are returned as `0`.
 | Medium | 30–39 |
 | Hard | 40+ |
 
----
-
-## Troubleshooting
-
-### CORS errors in browser
-
-- Confirm `CORS_ORIGINS` on Render exactly matches your Vercel URL (including `https://`, no trailing slash).
-- Redeploy the backend after changing `CORS_ORIGINS`.
-
-### `VITE_API_URL is not configured`
-
-Set `VITE_API_URL` in Vercel environment variables and redeploy.
-
-### Upload returns 503 — OCR unavailable
-
-Tesseract is not installed or not found. On Render, ensure you deploy with Docker (not native Python). Set `TESSERACT_CMD=/usr/bin/tesseract`.
-
-### Upload returns 400 — Could not detect grid
-
-- Use a clear photo with the full Sudoku grid visible.
-- Avoid heavy skew, glare, or cropped grids.
-- Enable `OCR_DEBUG=true` on the backend to inspect `backend/debug/` images.
-
-### Render cold starts
-
-Free-tier services spin down after inactivity. First request may take 30–60 seconds.
-
-### Local upload works, production does not
-
-1. Check `/health` on Render.
-2. Test upload with `curl -F "file=@puzzle.jpg" https://your-app.onrender.com/upload`.
-3. Check Render logs for Tesseract or OpenCV errors.
+Based on the number of zeros in the puzzle before solving.
 
 ---
 
@@ -251,16 +242,114 @@ Free-tier services spin down after inactivity. First request may take 30–60 se
 ```
 sudoku_solver/
 ├── backend/
-│   ├── main.py          # FastAPI app
-│   ├── config.py        # Environment settings
-│   ├── solver.py        # Backtracking solver
-│   ├── ocr.py           # Image processing + OCR
-│   ├── Dockerfile       # Render production image
-│   └── requirements.txt
+│   ├── main.py              # FastAPI app (/health, /solve, /upload)
+│   ├── config.py            # Environment settings
+│   ├── solver.py            # Backtracking solver + difficulty
+│   ├── ocr.py               # Grid detection, warp, cell OCR
+│   ├── Dockerfile           # Production image (Tesseract + OpenCV)
+│   ├── requirements.txt
+│   ├── .env.example
+│   └── diagnostics/         # Local OCR investigation scripts (gitignored output)
 ├── frontend/
 │   ├── src/
-│   │   ├── api.ts       # API client (uses VITE_API_URL)
-│   │   └── ...
-│   └── vercel.json
-└── render.yaml          # Render blueprint
+│   │   ├── App.tsx
+│   │   ├── api.ts           # API client (uses VITE_API_URL)
+│   │   └── components/
+│   ├── vercel.json
+│   └── .env.example
+├── render.yaml              # Render blueprint
+└── README.md
 ```
+
+---
+
+## OCR debug mode
+
+Set `OCR_DEBUG=true` in `backend/.env`. Each upload creates a timestamped folder under `backend/debug/`:
+
+| File | Stage |
+|------|--------|
+| `01_original.png` | Decoded upload |
+| `02_grayscale.png` | Grayscale conversion |
+| `03_grid_enhanced.png` | Background suppression + line emphasis |
+| `04_edges.png` | Canny edges for line detection |
+| `04_candidate_contours.png` | Grid detection overlay |
+| `04_detection.json` | Corners, path (fast/robust), metrics |
+| `04_grid_structure.json` | Line counts, spacing, bounding box |
+| `05_selected_contour.png` | Selected grid (green) |
+| `05_robust_fallback_contour.png` | Robust retry overlay (if validation failed on fast) |
+| `06_warped.png` | Perspective-corrected 450×450 board |
+| `07_threshold_board.png` | Thresholded warped grid |
+| `08_grid_validation.json` | Structure validation result |
+| `08_grid_lines.json` | Final horizontal/vertical line positions |
+| `09_cell_preprocessing.json` | Per-cell metrics and OCR results |
+| `cells/raw/r*_c*.png` | All 81 extracted cells |
+| `cells/processed/r*_c*.png` | All 81 OCR-ready cells |
+| `ocr_report.json` | Summary of all cell reports |
+
+Use this to see whether failure is in detection, warp, validation, segmentation, or OCR.
+
+---
+
+## Troubleshooting
+
+### CORS errors in browser
+
+- Confirm `CORS_ORIGINS` on Render exactly matches your Vercel URL (`https://`, no trailing slash).
+- Redeploy the backend after changing `CORS_ORIGINS`.
+
+### `VITE_API_URL is not configured`
+
+Set `VITE_API_URL` in Vercel environment variables and redeploy.
+
+### Upload returns 503 — OCR unavailable
+
+Tesseract is not installed or not found. On Render, deploy with Docker (not native Python). Set `TESSERACT_CMD=/usr/bin/tesseract`.
+
+### Upload returns 400 — Could not detect Sudoku grid
+
+- Use a photo where the full 9×9 grid is visible.
+- Avoid heavy crop, extreme glare, or very low contrast.
+- Enable `OCR_DEBUG=true` and inspect the latest folder under `backend/debug/`.
+
+### Upload returns 400 — No stable Sudoku grid detected
+
+The validation gate rejected the warped grid (bad spacing, aspect ratio, or edge density). Enable `OCR_DEBUG=true` and check `08_grid_validation.json`. The pipeline may have retried with the robust contour path before failing.
+
+### OCR reads wrong digits but grid looks correct
+
+OCR quality depends on font, print quality, and lighting. Check `cells/processed/` in debug output. The grid detection may be correct while individual cell recognition fails — that is a Stage 4 (OCR) issue, not grid detection.
+
+### Render cold starts
+
+Free-tier services spin down after inactivity. The first request may take 30–60 seconds.
+
+### Local upload works, production does not
+
+1. Check `/health` on Render.
+2. Test upload: `curl -F "file=@puzzle.jpg" https://your-app.onrender.com/upload`
+3. Check Render logs for Tesseract or OpenCV errors.
+
+---
+
+## Local OCR development
+
+Test images are not committed (see `.gitignore`). Add sample puzzles to `backend/test_images/` for local testing:
+
+```bash
+# From backend/ with venv active
+python -c "
+from pathlib import Path
+from ocr import extract_board
+board = extract_board(Path('test_images/your_puzzle.jpg').read_bytes())
+print(sum(1 for r in board for c in r if c), 'digits detected')
+"
+```
+
+Diagnostic scripts live in `backend/diagnostics/` for stage-by-stage investigation.
+
+---
+
+## License
+
+This project is provided as-is for personal and educational use. Add a `LICENSE` file if you plan to open-source under a specific terms.
