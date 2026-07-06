@@ -129,9 +129,10 @@ Render uses Docker so Tesseract and OpenCV system libraries are installed at bui
 
 1. **New** → **Web Service** → connect repo.
 2. Settings:
-   - **Root Directory:** `backend`
+   - **Root Directory:** *(leave empty)*
    - **Runtime:** Docker
    - **Dockerfile Path:** `Dockerfile`
+   - **Docker Build Context:** `.`
 3. Environment variables:
    ```
    CORS_ORIGINS=https://your-app.vercel.app
@@ -243,12 +244,15 @@ Based on the number of zeros in the puzzle before solving.
 
 ```
 sudoku_solver/
+├── Dockerfile               # Render production image (repo root)
+├── .dockerignore
 ├── backend/
 │   ├── main.py              # FastAPI app (/health, /solve, /upload)
 │   ├── config.py            # Environment settings
 │   ├── solver.py            # Backtracking solver + difficulty
 │   ├── ocr.py               # Grid detection, warp, cell OCR
-│   ├── Dockerfile           # Production image (Tesseract + OpenCV)
+│   ├── Dockerfile           # Local / alternate build (optional)
+│   ├── start.sh
 │   ├── requirements.txt
 │   ├── .env.example
 │   └── diagnostics/         # Local OCR investigation scripts (gitignored output)

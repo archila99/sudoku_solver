@@ -35,11 +35,14 @@ Deploy **backend first**, then frontend, then wire CORS.
 | Name | `sudoku-backend` |
 | Region | closest to your users |
 | Branch | `main` |
-| Root Directory | `backend` |
+| Root Directory | *(empty — repo root)* |
 | Runtime | **Docker** |
 | Dockerfile path | `Dockerfile` |
+| Docker build context | `.` |
 | Instance type | Free (or paid for faster OCR) |
 | Health check path | `/health` |
+
+> Leave **Root Directory** empty. The `Dockerfile` is at the repo root and copies `backend/` into the image.
 
 **Environment variables:**
 

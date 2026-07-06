@@ -1,0 +1,23 @@
+# Build from repo root — Render looks for ./Dockerfile by default.
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/ .
+
+ENV PYTHONUNBUFFERED=1
+ENV TESSERACT_CMD=/usr/bin/tesseract
+
+EXPOSE 8000
+
+RUN chmod +x start.sh
+CMD ["./start.sh"]
