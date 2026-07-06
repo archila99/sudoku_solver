@@ -9,6 +9,8 @@ A stateless full-stack Sudoku web app: manual grid input, backtracking solver wi
 
 No database. Upload an image → get a 9×9 board → solve in the browser.
 
+**→ Step-by-step deploy instructions: [DEPLOY.md](./DEPLOY.md)**
+
 ## Features
 
 - Interactive 9×9 grid with keyboard navigation
@@ -258,6 +260,7 @@ sudoku_solver/
 │   ├── vercel.json
 │   └── .env.example
 ├── render.yaml              # Render blueprint
+├── DEPLOY.md                # Render + Vercel deployment checklist
 └── README.md
 ```
 
